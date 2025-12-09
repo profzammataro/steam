@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catalogo App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .admin-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+
+        .admin-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.05);
+        }
+
+        .edit-mode-btn.active {
+            background: rgba(255, 59, 48, 0.9);
+        }
+
+        .search-container {
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+
+        .search-box:focus {
+            outline: none;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .app-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .app-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .app-preview {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .app-info {
+            padding: 20px;
+        }
+
+        .app-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .app-author {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .app-description {
+            color: #666;
+            font-size: 0.95em;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+
+        .card-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .app-card.edit-mode .card-actions {
+            display: flex;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .action-btn:hover {
+            transform: scale(1.15);
+        }
+
+        .edit-btn:hover {
+            background: #667eea;
+        }
+
+        .delete-btn:hover {
+            background: #ff3b30;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: white;
+            padding: 60px 20px;
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.7;
+        }
+
+        .empty-state-text {
+            font-size: 1.3em;
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            padding: 40px;
+            font-size: 1.2em;
+        }
+
+        .error-message {
+            background: rgba(255, 59, 48, 0.1);
+            border: 2px solid rgba(255, 59, 48, 0.5);
+            color: #ff3b30;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        #imagePreview {
+            margin-top: 10px;
+        }
+
+        #previewImg {
+            max-width: 100%;
+            border-radius: 8px;
+            max-height: 200px;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .image-info {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📱 Catalogo App</h1>
+            <p class="subtitle">Raccolta di applicazioni interattive</p>
+            <div class="controls">
+                <button class="admin-btn edit-mode-btn" id="editModeBtn" onclick="toggleEditMode()">✏️ Modalità Modifica</button>
+                <button class="admin-btn" onclick="showAddAppModal()">+ Aggiungi App</button>
+            </div>
+        </header>
+
+        <div class="search-container">
+            <input type="text" class="search-box" id="searchBox" placeholder="🔍 Cerca app per nome, autore o descrizione...">
+        </div>
+
+        <div id="loading" class="loading">Caricamento...</div>
+        <div id="gallery" class="gallery"></div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">📱</div>
+            <div class="empty-state-text">Nessuna app ancora. Clicca su "Aggiungi App" per iniziare!</div>
+        </div>
+    </div>
+
+    <!-- Modal Password per Modalità Modifica -->
+    <div id="editPasswordModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-header">Modalità Modifica</h2>
+            <div id="editPasswordError" class="error-message" style="display: none;"></div>
+            <div class="form-group">
+                <label for="editPassword">Password</label>
+                <input type="password" id="editPassword" placeholder="Inserisci la password">
+            </div>
+            <div class="btn-group">
+                <button class="btn-secondary" onclick="closeEditPasswordModal()">Annulla</button>
+                <button class="btn-primary" onclick="verifyEditPassword()">Attiva</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal per Aggiungi/Modifica App -->
+    <div id="appModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-header" id="modalTitle">Aggiungi Nuova App</h2>
+            <div id="appModalError" class="error-message" style="display: none;"></div>
+            <div id="passwordSection">
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Inserisci la password">
+                </div>
+                <div class="btn-group">
+                    <button class="btn-secondary" onclick="closeAppModal()">Annulla</button>
+                    <button class="btn-primary" onclick="verifyPassword()">Verifica</button>
+                </div>
+            </div>
+            <div id="formSection" style="display: none;">
+                <div class="form-group">
+                    <label for="appName">Nome App</label>
+                    <input type="text" id="appName" placeholder="Es: Calcolatrice Scientifica">
+                </div>
+                <div class="form-group">
+                    <label for="appAuthor">Autore</label>
+                    <input type="text" id="appAuthor" placeholder="Es: Mario Rossi">
+                </div>
+                <div class="form-group">
+                    <label for="appDescription">Descrizione</label>
+                    <textarea id="appDescription" placeholder="Breve descrizione dell'app..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="appUrl">URL App</label>
+                    <input type="url" id="appUrl" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label for="appImage">Immagine Anteprima</label>
+                    <input type="file" id="appImage" accept="image/*" onchange="handleImageUpload(event)">
+                    <div id="imagePreview" style="display: none;">
+                        <img id="previewImg" alt="Anteprima">
+                        <div class="image-info" id="imageInfo"></div>
+                        <button type="button" class="btn-secondary" onclick="removeImage()" style="padding: 8px 16px; margin-top: 5px;">Rimuovi immagine</button>
+                    </div>
+                    <small style="color: #666; display: block; margin-top: 5px;">Carica un'immagine dal tuo dispositivo (opzionale, max 1MB consigliato)</small>
+                </div>
+                <div class="btn-group">
+                    <button class="btn-secondary" onclick="closeAppModal()">Annulla</button>
+                    <button class="btn-primary" id="saveAppBtn" onclick="saveApp()">Salva App</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <script>
+        // Configurazione Firebase (stesso database)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDpcJBwUZJrVzidaToXH5bfvV8h7LtuMQU",
+            authDomain: "hopeboard-da041.firebaseapp.com",
+            databaseURL: "https://hopeboard-da041-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "hopeboard-da041",
+            storageBucket: "hopeboard-da041.firebasestorage.app",
+            messagingSenderId: "660906863783",
+            appId: "1:660906863783:web:ac031459c188c314bdbf82"
+        };
+
+        // Inizializza Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const appsRef = database.ref('interactive-apps');
+
+        const ADMIN_PASSWORD = 'zammy';
+        let apps = [];
+        let isEditMode = false;
+        let editingAppKey = null;
+        let searchTerm = '';
+        let uploadedImageBase64 = null;
+
+        // Carica le app da Firebase
+        async function loadApps() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('gallery').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'none';
+
+            try {
+                const snapshot = await appsRef.once('value');
+                const data = snapshot.val();
+                
+                if (data) {
+                    apps = Object.keys(data).map(key => ({
+                        firebaseKey: key,
+                        ...data[key]
+                    }));
+                } else {
+                    apps = [];
+                }
+            } catch (error) {
+                console.error('Errore nel caricamento:', error);
+                apps = [];
+            }
+
+            document.getElementById('loading').style.display = 'none';
+            renderGallery();
+        }
+
+        function getFilteredApps() {
+            let filtered = apps;
+
+            // Filtra per ricerca
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = filtered.filter(app => 
+                    app.name.toLowerCase().includes(term) ||
+                    app.description.toLowerCase().includes(term) ||
+                    app.author.toLowerCase().includes(term)
+                );
+            }
+
+            return filtered;
+        }
+
+        function renderGallery() {
+            const gallery = document.getElementById('gallery');
+            const emptyState = document.getElementById('emptyState');
+            const filteredApps = getFilteredApps();
+
+            if (filteredApps.length === 0) {
+                gallery.style.display = 'none';
+                emptyState.style.display = 'block';
+                if (searchTerm) {
+                    document.querySelector('.empty-state-text').textContent = 'Nessuna app trovata con i filtri selezionati.';
+                } else {
+                    document.querySelector('.empty-state-text').textContent = 'Nessuna app ancora. Clicca su "Aggiungi App" per iniziare!';
+                }
+                return;
+            }
+
+            gallery.style.display = 'grid';
+            emptyState.style.display = 'none';
+
+            gallery.innerHTML = filteredApps.map(app => {
+                return `
+                <div class="app-card ${isEditMode ? 'edit-mode' : ''}" onclick="openApp('${app.url}', event)">
+                    <div class="card-actions">
+                        <button class="action-btn edit-btn" onclick="editApp('${app.firebaseKey}', event)" title="Modifica">✏️</button>
+                        <button class="action-btn delete-btn" onclick="deleteApp('${app.firebaseKey}', event)" title="Elimina">🗑️</button>
+                    </div>
+                    <img src="${app.image || generatePlaceholder(app.name)}" 
+                         alt="${app.name}" 
+                         class="app-preview"
+                         onerror="this.src='${generatePlaceholder(app.name)}'">
+                    <div class="app-info">
+                        <span class="app-author">👤 ${escapeHtml(app.author)}</span>
+                        <div class="app-title">${escapeHtml(app.name)}</div>
+                        <div class="app-description">${escapeHtml(app.description)}</div>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function generatePlaceholder(name) {
+            const initial = name.charAt(0).toUpperCase();
+            const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a'];
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const color = colors[Math.abs(hash) % colors.length];
+            return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='200'%3E%3Crect fill='${encodeURIComponent(color)}' width='320' height='200'/%3E%3Ctext fill='white' font-size='80' font-family='Arial' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3E${initial}%3C/text%3E%3C/svg%3E`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function openApp(url, event) {
+            if (event && (event.target.classList.contains('action-btn') || 
+                          event.target.closest('.action-btn') || 
+                          event.target.closest('.card-actions'))) {
+                return;
+            }
+            if (!isEditMode) {
+                window.open(url, '_blank');
+            }
+        }
+
+        function toggleEditMode() {
+            if (!isEditMode) {
+                document.getElementById('editPasswordModal').classList.add('active');
+                document.getElementById('editPassword').value = '';
+                document.getElementById('editPasswordError').style.display = 'none';
+            } else {
+                isEditMode = false;
+                document.getElementById('editModeBtn').classList.remove('active');
+                document.getElementById('editModeBtn').textContent = '✏️ Modalità Modifica';
+                renderGallery();
+            }
+        }
+
+        function closeEditPasswordModal() {
+            document.getElementById('editPasswordModal').classList.remove('active');
+        }
+
+        function verifyEditPassword() {
+            const password = document.getElementById('editPassword').value;
+            if (password === ADMIN_PASSWORD) {
+                isEditMode = true;
+                document.getElementById('editModeBtn').classList.add('active');
+                document.getElementById('editModeBtn').textContent = '❌ Disattiva Modifica';
+                closeEditPasswordModal();
+                renderGallery();
+            } else {
+                document.getElementById('editPasswordError').textContent = 'Password errata!';
+                document.getElementById('editPasswordError').style.display = 'block';
+            }
+        }
+
+        function showAddAppModal() {
+            editingAppKey = null;
+            uploadedImageBase64 = null;
+            document.getElementById('modalTitle').textContent = 'Aggiungi Nuova App';
+            document.getElementById('appModal').classList.add('active');
+            document.getElementById('passwordSection').style.display = 'block';
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('password').value = '';
+            document.getElementById('appModalError').style.display = 'none';
+            document.getElementById('imagePreview').style.display = 'none';
+            document.getElementById('appImage').value = '';
+        }
+
+        function closeAppModal() {
+            document.getElementById('appModal').classList.remove('active');
+            editingAppKey = null;
+            uploadedImageBase64 = null;
+            document.getElementById('imagePreview').style.display = 'none';
+        }
+
+        function verifyPassword() {
+            const password = document.getElementById('password').value;
+            if (password === ADMIN_PASSWORD) {
+                document.getElementById('passwordSection').style.display = 'none';
+                document.getElementById('formSection').style.display = 'block';
+                document.getElementById('appModalError').style.display = 'none';
+            } else {
+                document.getElementById('appModalError').textContent = 'Password errata!';
+                document.getElementById('appModalError').style.display = 'block';
+            }
+        }
+
+        function editApp(firebaseKey, event) {
+            event.stopPropagation();
+            
+            const app = apps.find(a => a.firebaseKey === firebaseKey);
+            if (!app) return;
+
+            editingAppKey = firebaseKey;
+            uploadedImageBase64 = app.image || null;
+            
+            document.getElementById('modalTitle').textContent = 'Modifica App';
+            document.getElementById('appName').value = app.name;
+            document.getElementById('appAuthor').value = app.author;
+            document.getElementById('appDescription').value = app.description;
+            document.getElementById('appUrl').value = app.url;
+            
+            if (app.image) {
+                document.getElementById('previewImg').src = app.image;
+                document.getElementById('imagePreview').style.display = 'block';
+                const sizeKB = Math.round((app.image.length * 0.75) / 1024);
+                document.getElementById('imageInfo').textContent = `Dimensione: ~${sizeKB} KB`;
+            } else {
+                document.getElementById('imagePreview').style.display = 'none';
+            }
+            
+            document.getElementById('appModal').classList.add('active');
+            document.getElementById('passwordSection').style.display = 'block';
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('password').value = '';
+            document.getElementById('appModalError').style.display = 'none';
+        }
+
+        async function deleteApp(firebaseKey, event) {
+            event.stopPropagation();
+            
+            if (!confirm('Sei sicuro di voler eliminare questa app?')) {
+                return;
+            }
+
+            try {
+                await database.ref(`interactive-apps/${firebaseKey}`).remove();
+                await loadApps();
+            } catch (error) {
+                console.error('Errore nell\'eliminazione:', error);
+                alert('Errore nell\'eliminazione dell\'app: ' + error.message);
+            }
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                alert('Per favore seleziona un file immagine valido');
+                event.target.value = '';
+                return;
+            }
+
+            const maxSize = 1 * 1024 * 1024;
+            if (file.size > maxSize) {
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                if (!confirm(`L'immagine è grande (${sizeMB} MB). Questo potrebbe rallentare l'app. Continuare comunque?`)) {
+                    event.target.value = '';
+                    return;
+                }
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImageBase64 = e.target.result;
+                document.getElementById('previewImg').src = uploadedImageBase64;
+                document.getElementById('imagePreview').style.display = 'block';
+                
+                const sizeKB = Math.round(file.size / 1024);
+                document.getElementById('imageInfo').textContent = `Dimensione: ${sizeKB} KB`;
+            };
+            reader.onerror = () => {
+                alert('Errore nella lettura del file');
+                event.target.value = '';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeImage() {
+            uploadedImageBase64 = null;
+            document.getElementById('appImage').value = '';
+            document.getElementById('imagePreview').style.display = 'none';
+        }
+
+        async function saveApp() {
+            const name = document.getElementById('appName').value.trim();
+            const author = document.getElementById('appAuthor').value.trim();
+            const description = document.getElementById('appDescription').value.trim();
+            const url = document.getElementById('appUrl').value.trim();
+
+            if (!name || !author || !description || !url) {
+                document.getElementById('appModalError').textContent = 'Compila tutti i campi obbligatori!';
+                document.getElementById('appModalError').style.display = 'block';
+                return;
+            }
+
+            const saveBtn = document.getElementById('saveAppBtn');
+            const originalText = saveBtn.textContent;
+
+            try {
+                saveBtn.textContent = 'Salvataggio in corso...';
+                saveBtn.disabled = true;
+
+                const appData = {
+                    name,
+                    author,
+                    description,
+                    url,
+                    image: uploadedImageBase64 || '',
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (editingAppKey) {
+                    const app = apps.find(a => a.firebaseKey === editingAppKey);
+                    appData.id = app.id;
+                    appData.createdAt = app.createdAt;
+                    await database.ref(`interactive-apps/${editingAppKey}`).set(appData);
+                } else {
+                    appData.id = Date.now();
+                    appData.createdAt = new Date().toISOString();
+                    await appsRef.push(appData);
+                }
+                
+                closeAppModal();
+                await loadApps();
+                
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+            } catch (error) {
+                console.error('Errore nel salvataggio:', error);
+                document.getElementById('appModalError').textContent = 'Errore nel salvataggio: ' + error.message;
+                document.getElementById('appModalError').style.display = 'block';
+                
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+            }
+        }
+
+        // Listener per la ricerca
+        document.getElementById('searchBox').addEventListener('input', (e) => {
+            searchTerm = e.target.value.trim();
+            renderGallery();
+        });
+
+        // Inizializza l'app
+        loadApps();
+    </script>
+</body>
+</html>
