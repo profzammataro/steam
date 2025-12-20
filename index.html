@@ -459,23 +459,23 @@
         let clickCount = 0;
         let clickTimeout = null;
 
-        // Gestione click sull'icona
+        
         function handleIconClick() {
             clickCount++;
             
-            // Reset dopo 2 secondi di inattività
+            
             clearTimeout(clickTimeout);
             clickTimeout = setTimeout(() => {
                 clickCount = 0;
             }, 2000);
 
-            // Attiva admin mode dopo 5 click
+           
             if (clickCount === 5) {
                 isAdminMode = true;
                 document.getElementById('adminControls').classList.add('visible');
                 clickCount = 0;
                 
-                // Animazione feedback
+               
                 const icon = document.getElementById('titleIcon');
                 icon.style.transform = 'scale(1.3)';
                 setTimeout(() => {
