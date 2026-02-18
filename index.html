@@ -455,27 +455,28 @@
         let isAdminMode = false;
         let editingAppKey = null;
         let searchTerm = '';
-        let uploadedImageBase64 = null;
+        let uploadedImageFile = null;   // File oggetto per Firebase Storage
+        let uploadedImageBase64 = null; // Usato solo per immagini legacy già salvate in base64
         let clickCount = 0;
         let clickTimeout = null;
 
-        
+        // Gestione click sull'icona
         function handleIconClick() {
             clickCount++;
             
-            
+            // Reset dopo 2 secondi di inattività
             clearTimeout(clickTimeout);
             clickTimeout = setTimeout(() => {
                 clickCount = 0;
             }, 2000);
 
-           
+            // Attiva admin mode dopo 5 click
             if (clickCount === 5) {
                 isAdminMode = true;
                 document.getElementById('adminControls').classList.add('visible');
                 clickCount = 0;
                 
-               
+                // Animazione feedback
                 const icon = document.getElementById('titleIcon');
                 icon.style.transform = 'scale(1.3)';
                 setTimeout(() => {
@@ -547,8 +548,9 @@
             emptyState.style.display = 'none';
 
             gallery.innerHTML = filteredApps.map(app => {
+                const safeUrl = app.url ? app.url.replace(/'/g, '&#39;') : '';
                 return `
-                <div class="app-card ${isEditMode ? 'edit-mode' : ''}" onclick="openApp('${app.url}', event)">
+                <div class="app-card ${isEditMode ? 'edit-mode' : ''}" data-url="${safeUrl}" onclick="openApp(this.dataset.url, event)">
                     <div class="card-actions">
                         <button class="action-btn edit-btn" onclick="editApp('${app.firebaseKey}', event)" title="Modifica">✏️</button>
                         <button class="action-btn delete-btn" onclick="deleteApp('${app.firebaseKey}', event)" title="Elimina">🗑️</button>
@@ -556,6 +558,7 @@
                     <img src="${app.image || generatePlaceholder(app.name)}" 
                          alt="${app.name}" 
                          class="app-preview"
+                         loading="lazy"
                          onerror="this.src='${generatePlaceholder(app.name)}'">
                     <div class="app-info">
                         <span class="app-author">👤 ${escapeHtml(app.author)}</span>
@@ -592,6 +595,7 @@
             if (!isEditMode) {
                 window.open(url, '_blank');
             }
+            event.stopPropagation();
         }
 
         function toggleEditMode() {
@@ -614,6 +618,7 @@
             if (!isAdminMode) return;
             
             editingAppKey = null;
+            uploadedImageFile = null;
             uploadedImageBase64 = null;
             document.getElementById('modalTitle').textContent = 'Aggiungi Nuova App';
             document.getElementById('appName').value = '';
@@ -629,6 +634,7 @@
         function closeAppModal() {
             document.getElementById('appModal').classList.remove('active');
             editingAppKey = null;
+            uploadedImageFile = null;
             uploadedImageBase64 = null;
             document.getElementById('imagePreview').style.display = 'none';
         }
@@ -640,6 +646,8 @@
             if (!app) return;
 
             editingAppKey = firebaseKey;
+            uploadedImageFile = null;
+            // Mantieni riferimento all'immagine esistente (URL o base64 legacy)
             uploadedImageBase64 = app.image || null;
             
             document.getElementById('modalTitle').textContent = 'Modifica App';
@@ -651,8 +659,12 @@
             if (app.image) {
                 document.getElementById('previewImg').src = app.image;
                 document.getElementById('imagePreview').style.display = 'block';
-                const sizeKB = Math.round((app.image.length * 0.75) / 1024);
-                document.getElementById('imageInfo').textContent = `Dimensione: ~${sizeKB} KB`;
+                if (app.image.startsWith('data:')) {
+                    const sizeKB = Math.round((app.image.length * 0.75) / 1024);
+                    document.getElementById('imageInfo').textContent = `Immagine legacy (base64): ~${sizeKB} KB — sostituiscila per migliorare le performance`;
+                } else {
+                    document.getElementById('imageInfo').textContent = `Immagine su Firebase Storage ✓`;
+                }
             } else {
                 document.getElementById('imagePreview').style.display = 'none';
             }
@@ -668,9 +680,19 @@
                 return;
             }
 
+            const app = apps.find(a => a.firebaseKey === firebaseKey);
+
             try {
                 await database.ref(`interactive-apps/${firebaseKey}`).remove();
-                await loadApps();
+
+                // Elimina immagine da Storage se è un URL (non base64 legacy)
+                if (app && app.image && !app.image.startsWith('data:')) {
+                    await deleteImageFromStorage(app.image);
+                }
+
+                // Aggiorna lo stato locale senza ricaricare tutto
+                apps = apps.filter(a => a.firebaseKey !== firebaseKey);
+                renderGallery();
             } catch (error) {
                 console.error('Errore nell\'eliminazione:', error);
                 alert('Errore nell\'eliminazione dell\'app: ' + error.message);
@@ -687,32 +709,66 @@
                 return;
             }
 
-            const maxSize = 1 * 1024 * 1024;
-            if (file.size > maxSize) {
-                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                if (!confirm(`L'immagine è grande (${sizeMB} MB). Questo potrebbe rallentare l'app. Continuare comunque?`)) {
-                    event.target.value = '';
-                    return;
-                }
-            }
+            // Comprimi l'immagine prima di mostrarla in anteprima
+            compressImage(file, 800, 0.8).then(compressed => {
+                uploadedImageFile = compressed.file;
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                uploadedImageBase64 = e.target.result;
-                document.getElementById('previewImg').src = uploadedImageBase64;
+                document.getElementById('previewImg').src = compressed.dataUrl;
                 document.getElementById('imagePreview').style.display = 'block';
-                
-                const sizeKB = Math.round(file.size / 1024);
-                document.getElementById('imageInfo').textContent = `Dimensione: ${sizeKB} KB`;
-            };
-            reader.onerror = () => {
-                alert('Errore nella lettura del file');
-                event.target.value = '';
-            };
-            reader.readAsDataURL(file);
+
+                const originalKB = Math.round(file.size / 1024);
+                const compressedKB = Math.round(compressed.file.size / 1024);
+                document.getElementById('imageInfo').textContent =
+                    `Originale: ${originalKB} KB → Compressa: ${compressedKB} KB`;
+            });
+        }
+
+        // Comprime un'immagine usando Canvas
+        function compressImage(file, maxWidth, quality) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    const scale = Math.min(1, maxWidth / img.width);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob(blob => {
+                        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                        resolve({ file: new File([blob], 'image.jpg', { type: 'image/jpeg' }), dataUrl });
+                    }, 'image/jpeg', quality);
+                };
+                img.src = url;
+            });
+        }
+
+        // Carica l'immagine su Cloudinary e restituisce l'URL pubblico
+        async function uploadImageToStorage(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', 'catalogo_steam');
+            formData.append('folder', 'catalogo_app');
+
+            const res = await fetch('https://api.cloudinary.com/v1_1/dpjdgvydp/image/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) throw new Error('Errore nel caricamento immagine su Cloudinary');
+            const data = await res.json();
+            return data.secure_url;
+        }
+
+        // Su Cloudinary il piano gratuito non supporta delete via API unsigned — lo saltiamo
+        async function deleteImageFromStorage(imageUrl) {
+            // Le immagini vecchie rimangono su Cloudinary ma non pesano sul database
+            return;
         }
 
         function removeImage() {
+            uploadedImageFile = null;
             uploadedImageBase64 = null;
             document.getElementById('appImage').value = '';
             document.getElementById('imagePreview').style.display = 'none';
@@ -737,12 +793,27 @@
                 saveBtn.textContent = 'Salvataggio in corso...';
                 saveBtn.disabled = true;
 
+                // Se c'è un nuovo file immagine, caricalo su Firebase Storage
+                let imageUrl = uploadedImageBase64 || ''; // fallback a base64 legacy o stringa vuota
+                if (uploadedImageFile) {
+                    saveBtn.textContent = 'Caricamento immagine...';
+                    // Se stiamo modificando un'app che aveva già un'immagine su Storage, eliminiamola
+                    if (editingAppKey) {
+                        const existingApp = apps.find(a => a.firebaseKey === editingAppKey);
+                        if (existingApp && existingApp.image && !existingApp.image.startsWith('data:')) {
+                            await deleteImageFromStorage(existingApp.image);
+                        }
+                    }
+                    imageUrl = await uploadImageToStorage(uploadedImageFile);
+                    saveBtn.textContent = 'Salvataggio dati...';
+                }
+
                 const appData = {
                     name,
                     author,
                     description,
                     url,
-                    image: uploadedImageBase64 || '',
+                    image: imageUrl,
                     updatedAt: new Date().toISOString()
                 };
 
@@ -751,14 +822,21 @@
                     appData.id = app.id;
                     appData.createdAt = app.createdAt;
                     await database.ref(`interactive-apps/${editingAppKey}`).set(appData);
+
+                    // Aggiorna lo stato locale senza ricaricare tutto
+                    const idx = apps.findIndex(a => a.firebaseKey === editingAppKey);
+                    if (idx !== -1) apps[idx] = { firebaseKey: editingAppKey, ...appData };
                 } else {
                     appData.id = Date.now();
                     appData.createdAt = new Date().toISOString();
-                    await appsRef.push(appData);
+                    const newRef = await appsRef.push(appData);
+
+                    // Aggiungi la nuova app allo stato locale
+                    apps.push({ firebaseKey: newRef.key, ...appData });
                 }
                 
                 closeAppModal();
-                await loadApps();
+                renderGallery();
                 
                 saveBtn.textContent = originalText;
                 saveBtn.disabled = false;
@@ -772,10 +850,14 @@
             }
         }
 
-        // Listener per la ricerca
+        // Listener per la ricerca con debounce (evita rendering ad ogni tasto)
+        let searchDebounce;
         document.getElementById('searchBox').addEventListener('input', (e) => {
-            searchTerm = e.target.value.trim();
-            renderGallery();
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(() => {
+                searchTerm = e.target.value.trim();
+                renderGallery();
+            }, 250);
         });
 
         // Inizializza l'app
